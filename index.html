@@ -172,25 +172,29 @@
 
     <div class="card">
       <h2>Aus Fotos importieren</h2>
-      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap;">
-        <span style="font-size: 0.78rem; color: var(--muted); white-space: nowrap;">Zeitraum</span>
-        <input type="date" id="photoRangeStart" style="flex: 1 1 130px;" />
-        <span style="font-size: 0.78rem; color: var(--muted);">–</span>
-        <input type="date" id="photoRangeEnd" style="flex: 1 1 130px;" />
-      </div>
-      <p class="hint" style="margin: 0 0 8px;">Zeitraum optional: bei gesetztem Von–Bis werden alle Fotos im Zeitraum direkt importiert, ohne Prüfschritt.</p>
       <div class="drop-zone" id="dropZone">
         <div class="drop-icon">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
         </div>
-        <p class="drop-main">Fotos aus Photos.app hierher ziehen</p>
+        <p class="drop-main">Fotos hierher ziehen</p>
         <p class="drop-sub">oder</p>
         <input id="photoInput" type="file" accept="image/*" multiple class="file-input-hidden" />
         <button class="ghost" id="photoBtn" type="button">Fotos auswählen</button>
       </div>
+      <div style="display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
+        <span style="font-size: 0.78rem; color: var(--muted); white-space: nowrap; flex-shrink: 0;">Zeitraum</span>
+        <input type="date" id="photoRangeStart" style="flex: 1 1 120px; min-width: 0;" />
+        <span style="font-size: 0.78rem; color: var(--muted);">–</span>
+        <input type="date" id="photoRangeEnd" style="flex: 1 1 120px; min-width: 0;" />
+        <input id="photoRangeInput" type="file" accept="image/*" multiple class="file-input-hidden" />
+        <button class="primary" id="photoRangeBtn" type="button">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          Zeitraum scannen
+        </button>
+      </div>
       <div class="progress" id="photoProgress"><div class="progress-bar" id="photoProgressBar"></div></div>
       <div id="photoStatus" class="photo-status"></div>
-      <p class="hint">macOS: direkt aus Photos.app ziehen. iPhone/iPad: Button öffnet die Foto-Mediathek. Original-Format, sonst fehlen die Metadaten.</p>
+      <p class="hint">Drag & Drop / Auswählen: Prüfschritt vor Import. Zeitraum scannen: direkt eintragen ohne Rückfrage. Original-Format nötig, sonst fehlen GPS-Metadaten.</p>
     </div>
 
     <div class="card">
@@ -646,12 +650,28 @@
     }
   }
 
-  // File picker
+  // File picker (Drop-Zone)
   document.getElementById('photoBtn').addEventListener('click', (e) => {
     e.stopPropagation();
     document.getElementById('photoInput').click();
   });
   document.getElementById('photoInput').addEventListener('change', async (e) => {
+    const files = e.target.files;
+    await processFiles(files);
+    e.target.value = '';
+  });
+
+  // Zeitraum-Scan-Button
+  document.getElementById('photoRangeBtn').addEventListener('click', () => {
+    const s = document.getElementById('photoRangeStart').value;
+    const e = document.getElementById('photoRangeEnd').value;
+    if (!s || !e) {
+      document.getElementById('photoStatus').textContent = 'Bitte Von- und Bis-Datum setzen.';
+      return;
+    }
+    document.getElementById('photoRangeInput').click();
+  });
+  document.getElementById('photoRangeInput').addEventListener('change', async (e) => {
     const files = e.target.files;
     await processFiles(files);
     e.target.value = '';
