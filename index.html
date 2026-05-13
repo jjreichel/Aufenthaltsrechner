@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Aufenthaltsrechner 180 / 365</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script>
+<style>
+  :root {
+    --paper: #F6F1E5;
+    --card: #FBF7EC;
+    --line: #D9CFB5;
+    --empty: #EAE3CD;
+    --ink: #2C2A26;
+    --muted: #6B6760;
+    --faint: #9C9788;
+    --danger: #8B2635;
+    --warn: #BC6C25;
+    --ok: #386641;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", sans-serif;
+    padding: 24px;
+    min-height: 100vh;
+  }
+  .container { max-width: 1280px; margin: 0 auto; }
+  h1 { font-family: "Cormorant Garamond", serif; font-size: 2.4rem; font-weight: 600; margin: 0; letter-spacing: 0.01em; }
+  h2 { font-family: "Cormorant Garamond", serif; font-size: 1.25rem; margin: 0 0 12px; font-weight: 600; }
+  h3 { font-family: "Cormorant Garamond", serif; font-size: 1.15rem; margin: 0 0 8px; font-weight: 600; }
+  .header { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+  .anchor { width: 28px; height: 28px; color: var(--danger); }
+  .subtitle { font-style: italic; color: var(--muted); margin-top: 4px; margin-bottom: 24px; font-size: 0.95rem; }
+  .grid-top { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); margin-bottom: 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 18px; display: flex; flex-direction: column; }
+  /* Form layout: flexbox with wrap, prevents iOS date overflow */
+  .form-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .form-row > input { flex: 1 1 130px; min-width: 0; }
+  .form-row > input.country-input { flex: 2 1 160px; }
+  .form-row > button { flex: 0 0 auto; }
+  input, button, select { font-family: inherit; font-size: 1rem; border-radius: 3px; }
+  input, select { background: #fff; border: 1px solid var(--line); padding: 8px 10px; color: var(--ink); outline: none; min-width: 0; }
+  input:focus, select:focus { border-color: var(--ink); }
+  button { font-size: 0.9rem; }
+  button.primary { background: var(--ink); color: var(--paper); border: none; padding: 8px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  button.primary:hover { background: #000; }
+  button.primary:disabled { background: var(--faint); cursor: not-allowed; }
+  button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); padding: 8px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  button.ghost:hover { background: var(--paper); }
+  button.danger-btn { background: transparent; color: var(--danger); border: 1px solid var(--danger); padding: 8px 14px; cursor: pointer; }
+  button.danger-btn:hover { background: var(--danger); color: var(--paper); }
+  .hint { font-size: 0.75rem; color: var(--faint); margin: 10px 0 0; font-style: italic; }
+  .logbook { max-height: 140px; overflow-y: auto; padding-right: 4px; }
+  .log-empty { color: var(--faint); font-style: italic; font-size: 0.88rem; margin: 0; }
+  .log-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 0.85rem; }
+  .swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .country-name { font-weight: 500; min-width: 100px; }
+  .log-dates { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .del-btn { margin-left: auto; background: transparent; border: none; cursor: pointer; color: var(--faint); padding: 4px; display: flex; align-items: center; }
+  .del-btn:hover { color: var(--danger); }
+  .stats-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 24px; }
+  .stat-card { background: var(--card); border: 1px solid var(--line); padding: 14px; border-radius: 3px; }
+  .stat-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
+  .stat-name { font-family: "Cormorant Garamond", serif; font-size: 1.2rem; font-weight: 600; }
+  .stat-label { font-size: 0.75rem; color: var(--muted); }
+  .stat-value { font-size: 1.5rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .stat-value small { font-size: 0.85rem; color: var(--faint); font-weight: 400; }
+  .stat-max { font-size: 0.78rem; color: var(--muted); margin-top: 6px; }
+  .calendar-card { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 20px; }
+  .calendar-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+  .calendar-head h2 { margin: 0; font-size: 1.3rem; }
+  .legend { display: flex; align-items: center; gap: 16px; font-size: 0.75rem; color: var(--muted); flex-wrap: wrap; }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .legend i { width: 11px; height: 11px; display: inline-block; }
+  .hover-line { min-height: 28px; font-size: 0.85rem; color: var(--ink); margin-bottom: 10px; }
+  .hover-empty { color: var(--faint); font-style: italic; }
+  .years-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); }
+  .year-grid { display: grid; grid-template-columns: 34px repeat(31, 1fr); gap: 1.5px; }
+  .month-label { color: var(--muted); font-size: 0.72rem; text-align: right; padding-right: 6px; line-height: 15px; font-family: "Cormorant Garamond", serif; }
+  .day { height: 15px; background: var(--empty); border: 1px solid var(--line); cursor: pointer; transition: transform 0.08s; }
+  .day:hover { transform: scale(1.4); position: relative; z-index: 5; outline: 1px solid var(--ink); }
+  .day.empty-cell { background: transparent; border: none; cursor: default; }
+  .day.empty-cell:hover { transform: none; outline: none; }
+  .footer { font-size: 0.72rem; color: var(--faint); margin-top: 16px; font-style: italic; text-align: center; }
+  .icon { display: inline-block; vertical-align: middle; }
+  .danger { color: var(--danger); }
+  .warn { color: var(--warn); }
+  .ok { color: var(--ok); }
+  .name-dot { font-weight: 600; }
+
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(44, 42, 38, 0.45); display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+  .modal-backdrop.active { display: flex; }
+  .modal { background: var(--paper); border: 1px solid var(--line); border-radius: 4px; padding: 22px; max-width: 520px; width: 100%; box-shadow: 0 20px 50px rgba(0,0,0,0.18); }
+  .modal.wide { max-width: 760px; }
+  .modal h2 { margin-top: 0; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 18px; justify-content: flex-end; flex-wrap: wrap; }
+  .modal-field { margin-bottom: 12px; }
+  .modal-field label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; }
+  .modal-field input { width: 100%; }
+
+  .review-table { width: 100%; max-height: 380px; overflow-y: auto; border-top: 1px solid var(--line); margin-top: 8px; }
+  .review-row { display: grid; grid-template-columns: 24px 90px 1fr 70px; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--line); font-size: 0.85rem; }
+  .review-row.err { background: rgba(139, 38, 53, 0.06); }
+  .review-row input[type="text"] { padding: 4px 6px; font-size: 0.85rem; }
+  .review-stats { font-size: 0.8rem; color: var(--muted); margin: 8px 0; }
+  .progress { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin: 8px 0; display: none; }
+  .progress.active { display: block; }
+  .progress-bar { height: 100%; background: var(--ink); width: 0%; transition: width 0.2s; }
+
+  /* Drop zone for Photos.app drag and drop */
+  .drop-zone {
+    border: 1.5px dashed var(--line);
+    border-radius: 4px;
+    padding: 20px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: rgba(255,255,255,0.35);
+    margin-bottom: 8px;
+  }
+  .drop-zone:hover { border-color: var(--ink); background: rgba(255,255,255,0.55); }
+  .drop-zone.dragging {
+    border-color: var(--ink);
+    background: rgba(44, 42, 38, 0.06);
+    transform: scale(1.005);
+  }
+  .drop-zone .drop-main { font-size: 0.92rem; color: var(--ink); margin: 0 0 4px; font-weight: 500; }
+  .drop-zone .drop-sub { font-size: 0.78rem; color: var(--muted); margin: 4px 0 8px; font-style: italic; }
+  .drop-zone .drop-icon { color: var(--muted); margin-bottom: 6px; }
+
+  .file-input-hidden { display: none; }
+  .photo-status { font-size: 0.8rem; color: var(--muted); margin-top: 6px; min-height: 18px; }
+
+  @media (max-width: 600px) {
+    body { padding: 16px; }
+    h1 { font-size: 1.9rem; }
+    .review-row { grid-template-columns: 24px 1fr; gap: 4px; }
+    .review-row > span:nth-child(2) { grid-column: 2; }
+    .review-row > input { grid-column: 1 / -1; }
+    .review-row > span:last-child { grid-column: 1 / -1; text-align: left !important; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <svg class="anchor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"/><line x1="12" y1="22" x2="12" y2="8"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/></svg>
+    <h1>Aufenthaltsrechner 180 / 365</h1>
+  </div>
+  <p class="subtitle">Rolling Window: maximal 180 Tage je Land in 365 aufeinanderfolgenden Tagen. Erfasste Daten verbleiben lokal im Browser.</p>
+
+  <div class="grid-top">
+    <div class="card">
+      <h2>Manuell erfassen</h2>
+      <div class="form-row">
+        <input id="country" class="country-input" placeholder="Land" list="countriesList" />
+        <input id="start" type="date" />
+        <input id="end" type="date" />
+        <button class="primary" id="addBtn">
+          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Hinzu
+        </button>
+      </div>
+      <p class="hint">Start- und Enddatum sind inklusiv. Bestehende Tage werden überschrieben.</p>
+    </div>
+
+    <div class="card">
+      <h2>Aus Fotos importieren</h2>
+      <div class="drop-zone" id="dropZone">
+        <div class="drop-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </div>
+        <p class="drop-main">Fotos aus Photos.app hierher ziehen</p>
+        <p class="drop-sub">oder</p>
+        <input id="photoInput" type="file" accept="image/*" multiple class="file-input-hidden" />
+        <button class="ghost" id="photoBtn" type="button">Fotos auswählen</button>
+      </div>
+      <div class="progress" id="photoProgress"><div class="progress-bar" id="photoProgressBar"></div></div>
+      <div id="photoStatus" class="photo-status"></div>
+      <p class="hint">macOS: direkt aus Photos.app ziehen. iPhone/iPad: Button öffnet die Foto-Mediathek. Original-Format, sonst fehlen die Metadaten.</p>
+    </div>
+
+    <div class="card">
+      <h2>Logbuch <span style="color: var(--faint); font-size: 0.9rem;">(<span id="logCount">0</span>)</span></h2>
+      <div id="logbook" class="logbook"></div>
+    </div>
+  </div>
+
+  <div id="statsGrid" class="stats-grid"></div>
+
+  <div class="calendar-card">
+    <div class="calendar-head">
+      <h2>Kalender 2024 – 2027</h2>
+      <div class="legend">
+        <span><i style="background: var(--empty); border: 1px solid var(--line);"></i> kein Aufenthalt</span>
+        <span><i style="background: #3D5A80;"></i> Aufenthalt</span>
+        <span><i style="background: #3D5A80; box-shadow: inset 0 0 0 1.5px var(--danger);"></i> &gt; 180 in 365</span>
+      </div>
+    </div>
+    <div id="hoverLine" class="hover-line"><span class="hover-empty">Tag anklicken zum Bearbeiten. Mauszeiger über einen Tag zeigt Details.</span></div>
+    <div id="yearsGrid" class="years-grid"></div>
+  </div>
+
+  <p class="footer">Tool zur eigenen Orientierung · ersetzt weder Steuerberater noch Visumsrecherche · sapere aude.</p>
+</div>
+
+<div class="modal-backdrop" id="dayModalBackdrop">
+  <div class="modal">
+    <h2 id="dayModalTitle">Tag bearbeiten</h2>
+    <div class="modal-field">
+      <label>Land</label>
+      <input id="dayCountry" list="countriesList" placeholder="Leer lassen, um Tag zu löschen" />
+    </div>
+    <div class="modal-actions">
+      <button class="danger-btn" id="dayClearBtn">Tag löschen</button>
+      <button class="ghost" id="dayCancelBtn">Abbrechen</button>
+      <button class="primary" id="daySaveBtn">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="photoModalBackdrop">
+  <div class="modal wide">
+    <h2>Foto-Import prüfen</h2>
+    <div class="review-stats" id="reviewStats"></div>
+    <div class="review-table" id="reviewTable"></div>
+    <p class="hint">Länder können vor dem Import editiert werden. Bestehende Einträge werden überschrieben.</p>
+    <div class="modal-actions">
+      <button class="ghost" id="photoCancelBtn">Abbrechen</button>
+      <button class="primary" id="photoConfirmBtn">Importieren</button>
+    </div>
+  </div>
+</div>
+
+<datalist id="countriesList"></datalist>
+
+<script>
+  const COLORS = [
+    { bg: '#3D5A80' }, { bg: '#8B2635' }, { bg: '#386641' }, { bg: '#BC6C25' },
+    { bg: '#5E548E' }, { bg: '#005F73' }, { bg: '#9D4E3C' }, { bg: '#495057' },
+  ];
+  const YEARS = [2024, 2025, 2026, 2027];
+  const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+  const THRESHOLD = 180;
+  const WINDOW = 365;
+  const STORAGE_KEY = 'stays-180-365-v2';
+  const LEGACY_KEY = 'stays-180-365-v1';
+
+  const pad = (n) => String(n).padStart(2, '0');
+  const fmtDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const parseDate = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+  const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
+  const daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
+  const fmtDateDE = (s) => { const [y, m, d] = s.split('-'); return `${d}.${m}.${y}`; };
+  const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  let dayMap = {};
+  const geoCache = new Map();
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.version === 2 && parsed.days) { dayMap = parsed.days; return; }
+      }
+      const legacy = localStorage.getItem(LEGACY_KEY);
+      if (legacy) {
+        const arr = JSON.parse(legacy);
+        if (Array.isArray(arr)) {
+          arr.forEach(s => {
+            const a = parseDate(s.start);
+            const b = parseDate(s.end);
+            for (let d = new Date(a); d <= b; d = addDays(d, 1)) dayMap[fmtDate(d)] = s.country;
+          });
+          save();
+        }
+      }
+    } catch (e) { console.warn(e); }
+  }
+
+  function save() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, days: dayMap })); } catch (e) {}
+  }
+
+  function countriesList() {
+    const names = Array.from(new Set(Object.values(dayMap))).sort();
+    return names.map((n, i) => ({ name: n, bg: COLORS[i % COLORS.length].bg }));
+  }
+
+  function colorFor(name) {
+    return countriesList().find(c => c.name === name) || COLORS[0];
+  }
+
+  function getRanges() {
+    const sortedDates = Object.keys(dayMap).sort();
+    if (sortedDates.length === 0) return [];
+    const ranges = [];
+    let cur = { country: dayMap[sortedDates[0]], start: sortedDates[0], end: sortedDates[0] };
+    for (let i = 1; i < sortedDates.length; i++) {
+      const d = sortedDates[i];
+      const prev = sortedDates[i - 1];
+      const expectedNext = fmtDate(addDays(parseDate(prev), 1));
+      if (dayMap[d] === cur.country && d === expectedNext) cur.end = d;
+      else { ranges.push(cur); cur = { country: dayMap[d], start: d, end: d }; }
+    }
+    ranges.push(cur);
+    return ranges;
+  }
+
+  let allDayData = {};
+
+  function buildAllDayData() {
+    const countries = countriesList();
+    const startRange = new Date(2023, 0, 1);
+    const endRange = new Date(2027, 11, 31);
+    const prefix = {};
+    countries.forEach(c => { prefix[c.name] = new Map(); });
+    for (let d = new Date(startRange); d <= endRange; d = addDays(d, 1)) {
+      const dStr = fmtDate(d);
+      const prevStr = fmtDate(addDays(d, -1));
+      countries.forEach(c => {
+        const prevVal = prefix[c.name].get(prevStr) || 0;
+        prefix[c.name].set(dStr, prevVal + (dayMap[dStr] === c.name ? 1 : 0));
+      });
+    }
+    const result = {};
+    for (let d = new Date(2024, 0, 1); d <= endRange; d = addDays(d, 1)) {
+      const dStr = fmtDate(d);
+      const winStartStr = fmtDate(addDays(d, -WINDOW));
+      const sums = {};
+      countries.forEach(c => {
+        const e = prefix[c.name].get(dStr) || 0;
+        const s = prefix[c.name].get(winStartStr) || 0;
+        sums[c.name] = e - s;
+      });
+      const here = dayMap[dStr] || null;
+      const exceed = Object.values(sums).some(v => v > THRESHOLD);
+      result[dStr] = { sums, here, exceed };
+    }
+    allDayData = result;
+  }
+
+  function renderCountriesDatalist() {
+    const dl = document.getElementById('countriesList');
+    dl.innerHTML = countriesList().map(c => `<option value="${escapeHtml(c.name)}"></option>`).join('');
+  }
+
+  function renderLogbook() {
+    const wrap = document.getElementById('logbook');
+    const ranges = getRanges();
+    document.getElementById('logCount').textContent = ranges.length;
+    if (ranges.length === 0) {
+      wrap.innerHTML = '<p class="log-empty">Noch keine Aufenthalte erfasst.</p>';
+      return;
+    }
+    wrap.innerHTML = ranges.map((r, i) => {
+      const c = colorFor(r.country);
+      return `<div class="log-row">
+        <span class="swatch" style="background:${c.bg}"></span>
+        <span class="country-name">${escapeHtml(r.country)}</span>
+        <span class="log-dates">${fmtDateDE(r.start)}${r.start !== r.end ? ' – ' + fmtDateDE(r.end) : ''}</span>
+        <button class="del-btn" data-range="${i}" title="Bereich löschen">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+        </button>
+      </div>`;
+    }).join('');
+    wrap.querySelectorAll('.del-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.getAttribute('data-range'), 10);
+        const r = getRanges()[idx];
+        if (!r) return;
+        const a = parseDate(r.start);
+        const b = parseDate(r.end);
+        for (let d = new Date(a); d <= b; d = addDays(d, 1)) delete dayMap[fmtDate(d)];
+        save();
+        rerender();
+      });
+    });
+  }
+
+  function renderStats() {
+    const grid = document.getElementById('statsGrid');
+    const countries = countriesList();
+    const today = fmtDate(new Date());
+    if (countries.length === 0) { grid.innerHTML = ''; return; }
+    grid.innerHTML = countries.map(c => {
+      let max = 0, maxDate = null, current = 0;
+      Object.entries(allDayData).forEach(([d, info]) => {
+        const v = info.sums[c.name] || 0;
+        if (v > max) { max = v; maxDate = d; }
+        if (d === today) current = v;
+      });
+      const exceed = max > THRESHOLD;
+      const near = max > THRESHOLD * 0.8 && max <= THRESHOLD;
+      const accent = exceed ? 'var(--danger)' : near ? 'var(--warn)' : 'var(--ok)';
+      const iconCls = exceed ? 'danger' : near ? 'warn' : 'ok';
+      const icon = (exceed || near)
+        ? `<svg class="icon ${iconCls}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`
+        : `<svg class="icon ${iconCls}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
+      return `<div class="stat-card" style="border-left: 4px solid ${c.bg};">
+        <div class="stat-head"><span class="stat-name">${escapeHtml(c.name)}</span>${icon}</div>
+        <div class="stat-label">heute</div>
+        <div class="stat-value">${current} <small>/ ${THRESHOLD}</small></div>
+        <div class="stat-max">Maximum: <strong style="color:${accent}; font-variant-numeric: tabular-nums;">${max}</strong>${maxDate ? ' am ' + fmtDateDE(maxDate) : ''}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderCalendar() {
+    const wrap = document.getElementById('yearsGrid');
+    const today = fmtDate(new Date());
+    wrap.innerHTML = YEARS.map(year => {
+      let inner = `<div><h3>${year}</h3><div class="year-grid">`;
+      MONTHS.forEach((mName, mIdx) => {
+        inner += `<div class="month-label">${mName}</div>`;
+        const dim = daysInMonth(year, mIdx);
+        for (let dIdx = 0; dIdx < 31; dIdx++) {
+          const day = dIdx + 1;
+          if (day > dim) { inner += `<div class="day empty-cell"></div>`; continue; }
+          const dStr = `${year}-${pad(mIdx + 1)}-${pad(day)}`;
+          const info = allDayData[dStr];
+          let bg = 'var(--empty)';
+          let border = '1px solid var(--line)';
+          if (info && info.here) {
+            const col = colorFor(info.here).bg;
+            bg = col; border = `1px solid ${col}`;
+          }
+          if (info && info.exceed) {
+            if (!info.here) bg = '#F3D5D8';
+            border = '1.5px solid var(--danger)';
+          }
+          const todayShadow = (dStr === today) ? 'box-shadow: inset 0 0 0 1px var(--ink);' : '';
+          inner += `<div class="day" data-date="${dStr}" style="background:${bg}; border:${border}; ${todayShadow}"></div>`;
+        }
+      });
+      inner += `</div></div>`;
+      return inner;
+    }).join('');
+    wrap.querySelectorAll('.day[data-date]').forEach(el => {
+      const dStr = el.getAttribute('data-date');
+      el.addEventListener('mouseenter', () => showHover(dStr));
+      el.addEventListener('mouseleave', () => showHover(null));
+      el.addEventListener('click', () => openDayEditor(dStr));
+    });
+  }
+
+  function showHover(dStr) {
+    const wrap = document.getElementById('hoverLine');
+    if (!dStr || !allDayData[dStr]) {
+      wrap.innerHTML = '<span class="hover-empty">Tag anklicken zum Bearbeiten. Mauszeiger über einen Tag zeigt Details.</span>';
+      return;
+    }
+    const info = allDayData[dStr];
+    let html = `<strong style="font-variant-numeric: tabular-nums;">${fmtDateDE(dStr)}</strong>`;
+    if (info.here) html += ` · <span class="name-dot" style="color:${colorFor(info.here).bg};">${escapeHtml(info.here)}</span>`;
+    const entries = Object.entries(info.sums);
+    if (entries.length > 0) {
+      html += ` · <span style="color: var(--muted);">Rolling 365: </span>`;
+      html += entries.map(([c, v]) => {
+        const col = colorFor(c).bg;
+        const valStyle = v > THRESHOLD ? `color: var(--danger); font-weight: 600;` : '';
+        return `<span style="font-variant-numeric: tabular-nums;"><span style="color:${col}; font-weight: 500;">${escapeHtml(c)}</span> <span style="${valStyle}">${v}</span></span>`;
+      }).join(' · ');
+    }
+    wrap.innerHTML = html;
+  }
+
+  let currentEditDate = null;
+  function openDayEditor(dStr) {
+    currentEditDate = dStr;
+    document.getElementById('dayModalTitle').textContent = `Tag bearbeiten: ${fmtDateDE(dStr)}`;
+    document.getElementById('dayCountry').value = dayMap[dStr] || '';
+    document.getElementById('dayModalBackdrop').classList.add('active');
+    setTimeout(() => document.getElementById('dayCountry').focus(), 50);
+  }
+  function closeDayEditor() {
+    document.getElementById('dayModalBackdrop').classList.remove('active');
+    currentEditDate = null;
+  }
+  document.getElementById('daySaveBtn').addEventListener('click', () => {
+    if (!currentEditDate) return;
+    const val = document.getElementById('dayCountry').value.trim();
+    if (val) dayMap[currentEditDate] = val;
+    else delete dayMap[currentEditDate];
+    save();
+    closeDayEditor();
+    rerender();
+  });
+  document.getElementById('dayClearBtn').addEventListener('click', () => {
+    if (!currentEditDate) return;
+    delete dayMap[currentEditDate];
+    save();
+    closeDayEditor();
+    rerender();
+  });
+  document.getElementById('dayCancelBtn').addEventListener('click', closeDayEditor);
+  document.getElementById('dayModalBackdrop').addEventListener('click', (e) => {
+    if (e.target.id === 'dayModalBackdrop') closeDayEditor();
+  });
+  document.getElementById('dayCountry').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('daySaveBtn').click();
+    if (e.key === 'Escape') closeDayEditor();
+  });
+
+  document.getElementById('addBtn').addEventListener('click', () => {
+    const c = document.getElementById('country').value.trim();
+    const s = document.getElementById('start').value;
+    const e = document.getElementById('end').value;
+    if (!c || !s || !e) return;
+    if (parseDate(e) < parseDate(s)) return;
+    const a = parseDate(s);
+    const b = parseDate(e);
+    for (let d = new Date(a); d <= b; d = addDays(d, 1)) dayMap[fmtDate(d)] = c;
+    save();
+    document.getElementById('country').value = '';
+    document.getElementById('start').value = '';
+    document.getElementById('end').value = '';
+    rerender();
+  });
+
+  let pendingImport = [];
+
+  async function reverseGeocode(lat, lng) {
+    const key = `${lat.toFixed(1)},${lng.toFixed(1)}`;
+    if (geoCache.has(key)) return geoCache.get(key);
+    try {
+      const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=de`;
+      const r = await fetch(url);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+      const country = data.countryName || null;
+      geoCache.set(key, country);
+      return country;
+    } catch (e) {
+      console.warn('Geocoding failed:', e);
+      return null;
+    }
+  }
+
+  // Photo processing: unified function for both drop and file picker
+  async function processFiles(files) {
+    files = Array.from(files).filter(f => f.type.startsWith('image/'));
+    if (files.length === 0) {
+      document.getElementById('photoStatus').textContent = 'Keine Bilddateien gefunden.';
+      return;
+    }
+    const statusEl = document.getElementById('photoStatus');
+    const progressEl = document.getElementById('photoProgress');
+    const progressBar = document.getElementById('photoProgressBar');
+    progressEl.classList.add('active');
+    statusEl.textContent = `Lese ${files.length} Foto${files.length === 1 ? '' : 's'}...`;
+
+    const byDate = {};
+    let processed = 0;
+    let noGps = 0, noDate = 0;
+
+    for (const file of files) {
+      processed++;
+      progressBar.style.width = `${(processed / files.length * 50)}%`;
+      try {
+        const exif = await exifr.parse(file, { pick: ['DateTimeOriginal', 'CreateDate', 'GPSLatitude', 'GPSLongitude'] });
+        if (!exif) { noDate++; continue; }
+        const date = exif.DateTimeOriginal || exif.CreateDate;
+        if (!date) { noDate++; continue; }
+        const dStr = fmtDate(date);
+        const lat = exif.latitude !== undefined ? exif.latitude : null;
+        const lng = exif.longitude !== undefined ? exif.longitude : null;
+        if (lat === null || lng === null) {
+          noGps++;
+          if (!byDate[dStr]) byDate[dStr] = { lat: null, lng: null, count: 1 };
+          else byDate[dStr].count++;
+          continue;
+        }
+        if (!byDate[dStr]) byDate[dStr] = { lat, lng, count: 1 };
+        else byDate[dStr].count++;
+      } catch (err) { console.warn('EXIF failed for', file.name, err); }
+    }
+
+    const dates = Object.keys(byDate).sort();
+    pendingImport = [];
+    let geoIdx = 0;
+    for (const dStr of dates) {
+      geoIdx++;
+      progressBar.style.width = `${50 + (geoIdx / dates.length * 50)}%`;
+      statusEl.textContent = `Land ermitteln (${geoIdx}/${dates.length})...`;
+      const entry = byDate[dStr];
+      if (entry.lat === null) {
+        pendingImport.push({ date: dStr, country: '', lat: null, lng: null, count: entry.count, error: 'kein GPS' });
+        continue;
+      }
+      const country = await reverseGeocode(entry.lat, entry.lng);
+      pendingImport.push({
+        date: dStr,
+        country: country || '',
+        lat: entry.lat, lng: entry.lng,
+        count: entry.count,
+        error: country ? null : 'Land nicht gefunden'
+      });
+    }
+
+    progressEl.classList.remove('active');
+    progressBar.style.width = '0%';
+    statusEl.textContent = `${dates.length} Tage erkannt${noGps > 0 ? `, ${noGps} ohne GPS` : ''}${noDate > 0 ? `, ${noDate} ohne Datum` : ''}.`;
+
+    if (pendingImport.length === 0) return;
+    openPhotoReview();
+  }
+
+  // File picker
+  document.getElementById('photoBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.getElementById('photoInput').click();
+  });
+  document.getElementById('photoInput').addEventListener('change', async (e) => {
+    const files = e.target.files;
+    await processFiles(files);
+    e.target.value = '';
+  });
+
+  // Drag and drop zone for Photos.app
+  const dropZone = document.getElementById('dropZone');
+  dropZone.addEventListener('click', (e) => {
+    // Click on drop zone (but not button) triggers file picker too
+    if (e.target.id === 'photoBtn' || e.target.closest('#photoBtn')) return;
+    document.getElementById('photoInput').click();
+  });
+  ['dragenter', 'dragover'].forEach(evt => {
+    dropZone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.add('dragging');
+    });
+  });
+  ['dragleave', 'dragend'].forEach(evt => {
+    dropZone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (evt === 'dragleave' && dropZone.contains(e.relatedTarget)) return;
+      dropZone.classList.remove('dragging');
+    });
+  });
+  dropZone.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dropZone.classList.remove('dragging');
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) await processFiles(files);
+  });
+  // Prevent browser from opening the file when dropped outside the zone
+  ['dragover', 'drop'].forEach(evt => {
+    document.addEventListener(evt, (e) => {
+      if (!dropZone.contains(e.target)) e.preventDefault();
+    });
+  });
+
+  function openPhotoReview() {
+    const wrap = document.getElementById('reviewTable');
+    const valid = pendingImport.filter(p => p.country).length;
+    document.getElementById('reviewStats').innerHTML =
+      `<strong>${pendingImport.length}</strong> Tage erkannt, davon <strong>${valid}</strong> mit erkanntem Land.`;
+    wrap.innerHTML = pendingImport.map((p, i) => `
+      <div class="review-row${p.error ? ' err' : ''}">
+        <input type="checkbox" data-i="${i}" ${p.error || !p.country ? '' : 'checked'} />
+        <span style="font-variant-numeric: tabular-nums; font-size: 0.82rem;">${fmtDateDE(p.date)}</span>
+        <input type="text" data-country="${i}" value="${escapeHtml(p.country)}" placeholder="${p.error || 'Land'}" list="countriesList" />
+        <span style="font-size: 0.78rem; color: var(--muted); text-align: right;">${p.count} Foto${p.count === 1 ? '' : 's'}</span>
+      </div>
+    `).join('');
+    wrap.querySelectorAll('input[type="text"]').forEach(inp => {
+      inp.addEventListener('input', (e) => {
+        const i = parseInt(e.target.getAttribute('data-country'), 10);
+        pendingImport[i].country = e.target.value;
+        const checkbox = wrap.querySelector(`input[type="checkbox"][data-i="${i}"]`);
+        if (checkbox && e.target.value.trim()) checkbox.checked = true;
+      });
+    });
+    document.getElementById('photoModalBackdrop').classList.add('active');
+  }
+
+  document.getElementById('photoCancelBtn').addEventListener('click', () => {
+    document.getElementById('photoModalBackdrop').classList.remove('active');
+    pendingImport = [];
+  });
+
+  document.getElementById('photoConfirmBtn').addEventListener('click', () => {
+    const wrap = document.getElementById('reviewTable');
+    const checks = wrap.querySelectorAll('input[type="checkbox"]');
+    let imported = 0;
+    checks.forEach(cb => {
+      if (!cb.checked) return;
+      const i = parseInt(cb.getAttribute('data-i'), 10);
+      const entry = pendingImport[i];
+      const c = entry.country.trim();
+      if (!c) return;
+      dayMap[entry.date] = c;
+      imported++;
+    });
+    save();
+    document.getElementById('photoModalBackdrop').classList.remove('active');
+    document.getElementById('photoStatus').textContent = `${imported} Tag${imported === 1 ? '' : 'e'} importiert.`;
+    pendingImport = [];
+    rerender();
+  });
+
+  document.getElementById('photoModalBackdrop').addEventListener('click', (e) => {
+    if (e.target.id === 'photoModalBackdrop') {
+      document.getElementById('photoModalBackdrop').classList.remove('active');
+      pendingImport = [];
+    }
+  });
+
+  function rerender() {
+    buildAllDayData();
+    renderCountriesDatalist();
+    renderLogbook();
+    renderStats();
+    renderCalendar();
+  }
+
+  load();
+  rerender();
+</script>
+</body>
+</html>
