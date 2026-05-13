@@ -172,6 +172,11 @@
 
     <div class="card">
       <h2>Aus Fotos importieren</h2>
+      <div id="fileProtocolWarning" style="display:none; background: #FFF3CD; border: 1px solid #BC6C25; border-radius: 3px; padding: 10px 12px; margin-bottom: 10px; font-size: 0.82rem; color: #5a3e00;">
+        <strong>Drag &amp; Drop aus Photos.app funktioniert nur über HTTP.</strong><br>
+        Im Terminal ausführen und dann <a href="http://localhost:8080" style="color: var(--warn);">localhost:8080</a> öffnen:<br>
+        <code style="background: rgba(0,0,0,0.07); padding: 2px 6px; border-radius: 2px; font-size: 0.85em;">python3 -m http.server 8080</code>
+      </div>
       <div class="drop-zone" id="dropZone">
         <div class="drop-icon">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
@@ -775,6 +780,10 @@
     renderLogbook();
     renderStats();
     renderCalendar();
+  }
+
+  if (window.location.protocol === 'file:') {
+    document.getElementById('fileProtocolWarning').style.display = 'block';
   }
 
   load();
