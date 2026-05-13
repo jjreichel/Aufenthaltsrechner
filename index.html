@@ -181,17 +181,16 @@
         <div class="drop-icon">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
         </div>
-        <p class="drop-main">Fotos hierher ziehen</p>
+        <p class="drop-main" id="dropMain">Fotos aus Photos.app hierher ziehen</p>
         <p class="drop-sub">oder</p>
         <input id="photoInput" type="file" accept="image/*" multiple class="file-input-hidden" />
-        <button class="ghost" id="photoBtn" type="button">Fotos auswählen</button>
+        <button class="ghost" id="photoBtn" type="button">Aus Finder auswählen</button>
       </div>
       <div style="display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
         <span style="font-size: 0.78rem; color: var(--muted); white-space: nowrap; flex-shrink: 0;">Zeitraum</span>
         <input type="date" id="photoRangeStart" style="flex: 1 1 120px; min-width: 0;" />
         <span style="font-size: 0.78rem; color: var(--muted);">–</span>
         <input type="date" id="photoRangeEnd" style="flex: 1 1 120px; min-width: 0;" />
-        <input id="photoRangeInput" type="file" accept="image/*" multiple class="file-input-hidden" />
         <button class="primary" id="photoRangeBtn" type="button">
           <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           Zeitraum scannen
@@ -199,7 +198,7 @@
       </div>
       <div class="progress" id="photoProgress"><div class="progress-bar" id="photoProgressBar"></div></div>
       <div id="photoStatus" class="photo-status"></div>
-      <p class="hint">Drag & Drop / Auswählen: Prüfschritt vor Import. Zeitraum scannen: direkt eintragen ohne Rückfrage. Original-Format nötig, sonst fehlen GPS-Metadaten.</p>
+      <p class="hint">Fotos direkt aus Photos.app in die Drop-Zone ziehen. „Zeitraum scannen" aktiviert den Auto-Import: Fotos im Zeitraum werden direkt ohne Rückfrage eingetragen. Original-Format nötig (HEIC/JPEG), sonst fehlen GPS-Metadaten.</p>
     </div>
 
     <div class="card">
@@ -666,7 +665,7 @@
     e.target.value = '';
   });
 
-  // Zeitraum-Scan-Button
+  // Zeitraum-Scan-Button: aktiviert Drop-Zone für Auto-Import
   document.getElementById('photoRangeBtn').addEventListener('click', () => {
     const s = document.getElementById('photoRangeStart').value;
     const e = document.getElementById('photoRangeEnd').value;
@@ -674,12 +673,12 @@
       document.getElementById('photoStatus').textContent = 'Bitte Von- und Bis-Datum setzen.';
       return;
     }
-    document.getElementById('photoRangeInput').click();
-  });
-  document.getElementById('photoRangeInput').addEventListener('change', async (e) => {
-    const files = e.target.files;
-    await processFiles(files);
-    e.target.value = '';
+    const dropZoneEl = document.getElementById('dropZone');
+    document.getElementById('dropMain').textContent = `Fotos ${fmtDateDE(s)} – ${fmtDateDE(e)} hierher ziehen`;
+    dropZoneEl.style.borderColor = 'var(--ink)';
+    dropZoneEl.style.background = 'rgba(44,42,38,0.04)';
+    dropZoneEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById('photoStatus').textContent = 'Drop-Zone bereit — Fotos aus Photos.app hineinziehen.';
   });
 
   // Drag and drop zone for Photos.app
