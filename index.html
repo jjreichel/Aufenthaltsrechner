@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Aufenthaltsrechner 180 / 365</title>
+<title>JJRs Aufenthaltsrechner 180 / 365</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -151,7 +151,7 @@
 <div class="container">
   <div class="header">
     <svg class="anchor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"/><line x1="12" y1="22" x2="12" y2="8"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/></svg>
-    <h1>Aufenthaltsrechner 180 / 365</h1>
+    <h1>JJRs Aufenthaltsrechner 180 / 365</h1>
   </div>
   <p class="subtitle">Rolling Window: maximal 180 Tage je Land in 365 aufeinanderfolgenden Tagen. Erfasste Daten verbleiben lokal im Browser.</p>
 
@@ -172,11 +172,13 @@
 
     <div class="card">
       <h2>Aus Fotos importieren</h2>
-      <div class="form-row" style="margin-bottom: 8px;">
-        <input type="date" id="photoRangeStart" title="Zeitraum von" />
-        <input type="date" id="photoRangeEnd" title="Zeitraum bis" />
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap;">
+        <span style="font-size: 0.78rem; color: var(--muted); white-space: nowrap;">Zeitraum</span>
+        <input type="date" id="photoRangeStart" style="flex: 1 1 130px;" />
+        <span style="font-size: 0.78rem; color: var(--muted);">–</span>
+        <input type="date" id="photoRangeEnd" style="flex: 1 1 130px;" />
       </div>
-      <p class="hint" style="margin: 0 0 8px;">Zeitraum optional: Fotos außerhalb werden ignoriert, Import erfolgt automatisch ohne Prüfung.</p>
+      <p class="hint" style="margin: 0 0 8px;">Zeitraum optional: bei gesetztem Von–Bis werden alle Fotos im Zeitraum direkt importiert, ohne Prüfschritt.</p>
       <div class="drop-zone" id="dropZone">
         <div class="drop-icon">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
@@ -584,7 +586,10 @@
           continue;
         }
         if (!byDate[dStr]) byDate[dStr] = { lat, lng, count: 1 };
-        else byDate[dStr].count++;
+        else {
+          byDate[dStr].count++;
+          if (byDate[dStr].lat === null) { byDate[dStr].lat = lat; byDate[dStr].lng = lng; }
+        }
       } catch (err) { console.warn('EXIF failed for', file.name, err); }
     }
 
@@ -626,12 +631,15 @@
 
     if (autoMode) {
       let imported = 0;
+      const noGpsInRange = pendingImport.filter(p => p.error === 'kein GPS').length;
       pendingImport.forEach(p => {
         if (p.country) { dayMap[p.date] = p.country; imported++; }
       });
       save();
       rerender();
-      statusEl.textContent = `${imported} Tag${imported === 1 ? '' : 'e'} automatisch importiert (${fmtDateDE(rangeStart)} – ${fmtDateDE(rangeEnd)}).`;
+      let msg = `${imported} Tag${imported === 1 ? '' : 'e'} importiert (${fmtDateDE(rangeStart)} – ${fmtDateDE(rangeEnd)})`;
+      if (noGpsInRange > 0) msg += `, ${noGpsInRange} ohne GPS übersprungen`;
+      statusEl.textContent = msg + '.';
     } else {
       statusEl.textContent = `${dates.length} Tage erkannt${noGps > 0 ? `, ${noGps} ohne GPS` : ''}${noDate > 0 ? `, ${noDate} ohne Datum` : ''}.`;
       openPhotoReview();
