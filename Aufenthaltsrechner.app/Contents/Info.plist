@@ -18,6 +18,8 @@
     <string>APPL</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Aufenthaltsrechner liest GPS-Daten aus deiner Foto-Mediathek, um Aufenthaltsorte zu ermitteln.</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>LSMinimumSystemVersion</key>
