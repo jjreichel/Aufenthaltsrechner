@@ -16,5 +16,8 @@
 .env
 .env.local
 
+# Compiled binary
+Aufenthaltsrechner.app/Contents/MacOS/Aufenthaltsrechner
+
 # Claude
 CLAUDE.md
