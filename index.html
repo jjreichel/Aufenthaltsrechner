@@ -72,6 +72,14 @@
   .stat-value { font-size: 1.5rem; font-weight: 500; font-variant-numeric: tabular-nums; }
   .stat-value small { font-size: 0.85rem; color: var(--faint); font-weight: 400; }
   .stat-max { font-size: 0.78rem; color: var(--muted); margin-top: 6px; }
+  .stat-remain { font-size: 0.82rem; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .logbook-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .logbook-head h2 { margin: 0; }
+  .logbook-actions { display: flex; gap: 6px; }
+  .logbook-actions button { font-size: 0.78rem; padding: 4px 10px; }
+  .form-error { color: var(--danger); font-style: normal; }
+  input.invalid { border-color: var(--danger); }
+  .native-badge { display: inline-block; font-size: 0.72rem; background: rgba(56, 102, 65, 0.12); color: var(--ok); border: 1px solid rgba(56, 102, 65, 0.35); border-radius: 3px; padding: 2px 8px; margin-left: 8px; font-style: normal; vertical-align: middle; }
   .calendar-card { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 20px; }
   .calendar-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
   .calendar-head h2 { margin: 0; font-size: 1.3rem; }
@@ -178,7 +186,7 @@
           Hinzu
         </button>
       </div>
-      <p class="hint">Start- und Enddatum sind inklusiv. Bestehende Tage werden überschrieben.</p>
+      <p class="hint" id="formHint">Start- und Enddatum sind inklusiv. Bestehende Tage werden überschrieben.</p>
     </div>
 
     <div class="card">
@@ -209,11 +217,18 @@
       </div>
       <div class="progress" id="photoProgress"><div class="progress-bar" id="photoProgressBar"></div></div>
       <div id="photoStatus" class="photo-status"></div>
-      <p class="hint">Fotos direkt aus Photos.app in die Drop-Zone ziehen. „Zeitraum scannen" aktiviert den Auto-Import: Fotos im Zeitraum werden direkt ohne Rückfrage eingetragen. Original-Format nötig (HEIC/JPEG), sonst fehlen GPS-Metadaten.</p>
+      <p class="hint" id="photoHint">Fotos direkt aus Photos.app in die Drop-Zone ziehen. „Zeitraum scannen" aktiviert den Auto-Import: Fotos im Zeitraum werden direkt ohne Rückfrage eingetragen. Original-Format nötig (HEIC/JPEG), sonst fehlen GPS-Metadaten.</p>
     </div>
 
     <div class="card">
-      <h2>Logbuch <span style="color: var(--faint); font-size: 0.9rem;">(<span id="logCount">0</span>)</span></h2>
+      <div class="logbook-head">
+        <h2>Logbuch <span style="color: var(--faint); font-size: 0.9rem;">(<span id="logCount">0</span>)</span></h2>
+        <div class="logbook-actions">
+          <button class="ghost" id="exportBtn" type="button" title="Daten als JSON sichern">Export</button>
+          <button class="ghost" id="importBtn" type="button" title="JSON-Backup einspielen">Import</button>
+          <input id="importInput" type="file" accept="application/json,.json" class="file-input-hidden" />
+        </div>
+      </div>
       <div id="logbook" class="logbook"></div>
     </div>
   </div>
@@ -287,20 +302,35 @@
   const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
   let dayMap = {};
+  let colorMap = {};
   const geoCache = new Map();
+
+  function ensureColor(name) {
+    if (!name || colorMap[name] !== undefined) return;
+    const used = new Set(Object.values(colorMap));
+    let idx = 0;
+    while (used.has(idx)) idx++;
+    colorMap[name] = idx;
+  }
 
   function load() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed && parsed.version === 2 && parsed.days) { dayMap = parsed.days; return; }
+        if (parsed && parsed.version === 2 && parsed.days) {
+          dayMap = parsed.days;
+          if (parsed.colors) colorMap = parsed.colors;
+          Object.values(dayMap).forEach(ensureColor);
+          return;
+        }
       }
       const legacy = localStorage.getItem(LEGACY_KEY);
       if (legacy) {
         const arr = JSON.parse(legacy);
         if (Array.isArray(arr)) {
           arr.forEach(s => {
+            ensureColor(s.country);
             const a = parseDate(s.start);
             const b = parseDate(s.end);
             for (let d = new Date(a); d <= b; d = addDays(d, 1)) dayMap[fmtDate(d)] = s.country;
@@ -312,12 +342,12 @@
   }
 
   function save() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, days: dayMap })); } catch (e) {}
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, days: dayMap, colors: colorMap })); } catch (e) {}
   }
 
   function countriesList() {
     const names = Array.from(new Set(Object.values(dayMap))).sort();
-    return names.map((n, i) => ({ name: n, bg: COLORS[i % COLORS.length].bg }));
+    return names.map(n => ({ name: n, bg: COLORS[(colorMap[n] || 0) % COLORS.length].bg }));
   }
 
   function colorFor(name) {
@@ -416,28 +446,40 @@
     const countries = countriesList();
     const today = fmtDate(new Date());
     if (countries.length === 0) { grid.innerHTML = ''; return; }
-    grid.innerHTML = countries.map(c => {
+    const cards = countries.map(c => {
       let max = 0, maxDate = null, current = 0;
       Object.entries(allDayData).forEach(([d, info]) => {
         const v = info.sums[c.name] || 0;
         if (v > max) { max = v; maxDate = d; }
         if (d === today) current = v;
       });
-      const exceed = max > THRESHOLD;
-      const near = max > THRESHOLD * 0.8 && max <= THRESHOLD;
+      const exceed = current > THRESHOLD;
+      const near = current > THRESHOLD * 0.8 && current <= THRESHOLD;
       const accent = exceed ? 'var(--danger)' : near ? 'var(--warn)' : 'var(--ok)';
       const iconCls = exceed ? 'danger' : near ? 'warn' : 'ok';
+      const remain = THRESHOLD - current;
+      const remainHtml = exceed
+        ? `<div class="stat-remain" style="color: var(--danger);">${current - THRESHOLD} Tag${current - THRESHOLD === 1 ? '' : 'e'} über Limit</div>`
+        : near
+          ? `<div class="stat-remain" style="color: var(--warn);">noch ${remain} Tag${remain === 1 ? '' : 'e'} frei</div>`
+          : `<div class="stat-remain" style="color: var(--ok);">noch ${remain} Tag${remain === 1 ? '' : 'e'} frei</div>`;
       const icon = (exceed || near)
         ? `<svg class="icon ${iconCls}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`
         : `<svg class="icon ${iconCls}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
-      return `<div class="stat-card" style="border-left: 4px solid ${c.bg};">
+      return { c, current, max, maxDate, accent, icon, remainHtml, sortKey: current };
+    });
+    cards.sort((a, b) => b.sortKey - a.sortKey);
+    grid.innerHTML = cards.map(({ c, current, max, maxDate, accent, icon, remainHtml }) => `
+      <div class="stat-card" style="border-left: 4px solid ${c.bg};">
         <div class="stat-head"><span class="stat-name">${escapeHtml(c.name)}</span>${icon}</div>
-        <div class="stat-label">heute</div>
+        <div class="stat-label">Rolling 365 · heute</div>
         <div class="stat-value">${current} <small>/ ${THRESHOLD}</small></div>
+        ${remainHtml}
         <div class="stat-max">Maximum: <strong style="color:${accent}; font-variant-numeric: tabular-nums;">${max}</strong>${maxDate ? ' am ' + fmtDateDE(maxDate) : ''}</div>
-      </div>`;
-    }).join('');
+      </div>`).join('');
   }
+
+  let pinnedHoverDate = null;
 
   function renderCalendar() {
     const wrap = document.getElementById('yearsGrid');
@@ -472,9 +514,14 @@
     wrap.querySelectorAll('.day[data-date]').forEach(el => {
       const dStr = el.getAttribute('data-date');
       el.addEventListener('mouseenter', () => showHover(dStr));
-      el.addEventListener('mouseleave', () => showHover(null));
-      el.addEventListener('click', () => openDayEditor(dStr));
+      el.addEventListener('mouseleave', () => { if (!pinnedHoverDate) showHover(null); });
+      el.addEventListener('click', () => {
+        pinnedHoverDate = dStr;
+        showHover(dStr);
+        openDayEditor(dStr);
+      });
     });
+    if (pinnedHoverDate && allDayData[pinnedHoverDate]) showHover(pinnedHoverDate);
   }
 
   function showHover(dStr) {
@@ -509,11 +556,13 @@
   function closeDayEditor() {
     document.getElementById('dayModalBackdrop').classList.remove('active');
     currentEditDate = null;
+    pinnedHoverDate = null;
+    showHover(null);
   }
   document.getElementById('daySaveBtn').addEventListener('click', () => {
     if (!currentEditDate) return;
     const val = document.getElementById('dayCountry').value.trim();
-    if (val) dayMap[currentEditDate] = val;
+    if (val) { ensureColor(val); dayMap[currentEditDate] = val; }
     else delete dayMap[currentEditDate];
     save();
     closeDayEditor();
@@ -535,12 +584,29 @@
     if (e.key === 'Escape') closeDayEditor();
   });
 
-  document.getElementById('addBtn').addEventListener('click', () => {
+  function setFormHint(msg, isError) {
+    const el = document.getElementById('formHint');
+    el.textContent = msg;
+    el.classList.toggle('form-error', !!isError);
+  }
+
+  function addStay() {
     const c = document.getElementById('country').value.trim();
     const s = document.getElementById('start').value;
     const e = document.getElementById('end').value;
-    if (!c || !s || !e) return;
-    if (parseDate(e) < parseDate(s)) return;
+    document.getElementById('start').classList.remove('invalid');
+    document.getElementById('end').classList.remove('invalid');
+    if (!c || !s || !e) {
+      setFormHint('Bitte Land, Start- und Enddatum ausfüllen.', true);
+      return;
+    }
+    if (parseDate(e) < parseDate(s)) {
+      document.getElementById('start').classList.add('invalid');
+      document.getElementById('end').classList.add('invalid');
+      setFormHint('Enddatum darf nicht vor Startdatum liegen.', true);
+      return;
+    }
+    ensureColor(c);
     const a = parseDate(s);
     const b = parseDate(e);
     for (let d = new Date(a); d <= b; d = addDays(d, 1)) dayMap[fmtDate(d)] = c;
@@ -548,7 +614,19 @@
     document.getElementById('country').value = '';
     document.getElementById('start').value = '';
     document.getElementById('end').value = '';
+    setFormHint('Start- und Enddatum sind inklusiv. Bestehende Tage werden überschrieben.', false);
     rerender();
+  }
+
+  document.getElementById('addBtn').addEventListener('click', addStay);
+  document.getElementById('country').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addStay();
+  });
+  document.getElementById('start').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addStay();
+  });
+  document.getElementById('end').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addStay();
   });
 
   let pendingImport = [];
@@ -652,7 +730,7 @@
       let imported = 0;
       const noGpsInRange = pendingImport.filter(p => p.error === 'kein GPS').length;
       pendingImport.forEach(p => {
-        if (p.country) { dayMap[p.date] = p.country; imported++; }
+        if (p.country) { ensureColor(p.country); dayMap[p.date] = p.country; imported++; }
       });
       save();
       rerender();
@@ -774,6 +852,7 @@
       const entry = pendingImport[i];
       const c = entry.country.trim();
       if (!c) return;
+      ensureColor(c);
       dayMap[entry.date] = c;
       imported++;
     });
@@ -805,6 +884,62 @@
     document.getElementById('fileProtocolWarning').style.display = 'block';
   }
 
+  if (isNativeApp) {
+    const badge = document.createElement('span');
+    badge.className = 'native-badge';
+    badge.textContent = 'Photos.app direkt';
+    document.querySelector('.header h1').appendChild(badge);
+    document.getElementById('photoHint').textContent =
+      '„Zeitraum scannen" liest Fotos direkt aus Photos.app und trägt sie ohne Rückfrage ein. Drag & Drop funktioniert ebenfalls.';
+  }
+
+  const todayStr = fmtDate(new Date());
+  const yearStart = `${new Date().getFullYear()}-01-01`;
+  document.getElementById('photoRangeStart').value = yearStart;
+  document.getElementById('photoRangeEnd').value = todayStr;
+
+  document.getElementById('exportBtn').addEventListener('click', () => {
+    const payload = JSON.stringify({ version: 2, days: dayMap, colors: colorMap }, null, 2);
+    const blob = new Blob([payload], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `aufenthalte-${todayStr}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  document.getElementById('importBtn').addEventListener('click', () => {
+    document.getElementById('importInput').click();
+  });
+
+  document.getElementById('importInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        if (!parsed || parsed.version !== 2 || !parsed.days) throw new Error('Ungültiges Format');
+        const dayCount = Object.keys(parsed.days).length;
+        const replace = confirm(`${dayCount} Tage importieren?\n\nOK = ersetzen · Abbrechen = mit bestehenden Daten zusammenführen`);
+        if (replace) {
+          dayMap = parsed.days;
+          colorMap = parsed.colors || {};
+        } else {
+          Object.assign(dayMap, parsed.days);
+          if (parsed.colors) Object.assign(colorMap, parsed.colors);
+        }
+        Object.values(dayMap).forEach(ensureColor);
+        save();
+        rerender();
+      } catch (err) {
+        alert('Import fehlgeschlagen: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  });
+
   // Callbacks für native macOS-App (Swift → JS)
   window.photosProgress = function(done, total) {
     const pct = total > 0 ? Math.round(done / total * 100) : 0;
@@ -817,7 +952,7 @@
     document.getElementById('photoProgressBar').style.width = '0%';
     let imported = 0;
     Object.entries(dateMap).forEach(([date, country]) => {
-      if (country) { dayMap[date] = country; imported++; }
+      if (country) { ensureColor(country); dayMap[date] = country; imported++; }
     });
     save();
     rerender();
